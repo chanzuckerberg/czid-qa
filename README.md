@@ -20,3 +20,5 @@ Example use:
     --------------------------------------------------------------------------------------------------------
     Found 34 failed of 83 total gsnap chunks ( 41% failure rate) under project s3://idseq-samples-staging/samples/232.    
 ```
+
+Append the keyword `download` to that command and it will fetch all failed chunks.

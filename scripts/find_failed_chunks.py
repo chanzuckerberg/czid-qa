@@ -5,12 +5,13 @@ assert sys.version_info >= (3, 6), "Please run this script with Python version >
 
 import os
 import json
-from util import smart_ls
+import threading
+from util import smart_ls, check_output
 
 
 EXIT_SUCCESS = 0
-
-
+EXIT_DOWNLOAD_ERRORS = 101
+CONCURRENT_DOWNLOADS = 8
 DEBUG = False
 
 
@@ -53,6 +54,16 @@ def drop(prefix, s, suffix):
     return s[len(prefix) : len(s) - len(suffix)]
 
 
+def download(command, failed_downloads, downloader_license=threading.Semaphore(CONCURRENT_DOWNLOADS), lock=threading.RLock()):
+    with downloader_license:
+        try:
+            check_output(command)
+        except:
+            with lock:
+                failed_downloads[command] = True
+            raise
+
+
 def main(argv):
     project_path = parse_project_path(argv)
     print(f"Scoring project {project_path}.")
@@ -62,16 +73,17 @@ def main(argv):
     project_failed_chunks = 0
     project_total_chunks = 0
     print("--------------------------------------------------------------------------------------------------------")
-    for sample_results_path in find_samples_results(project_path):
-        sample_chunks = smart_ls(f"{sample_results_path}/chunks", missing_ok=True, quiet=True)
-        sample_chunks = [
-            c.replace(GSNAP_ALT_PREFIX, GSNAP_FA_PREFIX) if c.startswith(GSNAP_ALT_PREFIX) else c
-            for c in sample_chunks
-        ]
+    failed_chunks = []
+    for sample_results_path in sorted(find_samples_results(project_path)):
+        sample_chunks = sorted(smart_ls(f"{sample_results_path}/chunks", missing_ok=True, quiet=True))
+        if any(c.startswith(GSNAP_ALT_PREFIX) for c in sample_chunks):
+            GSNAP_INPUT_PREFIX = GSNAP_ALT_PREFIX
+        else:
+            GSNAP_INPUT_PREFIX = GSNAP_FA_PREFIX
         read_1_chunk_ids = set(
-            drop(GSNAP_FA_PREFIX, c, "")
+            drop(GSNAP_INPUT_PREFIX, c, "")
             for c in sample_chunks
-            if c.startswith(GSNAP_FA_PREFIX)
+            if c.startswith(GSNAP_INPUT_PREFIX)
         )
         gsnap_success_ids = set(
             drop(GSNAP_M8_PREFIX, c, ".m8")
@@ -89,10 +101,31 @@ def main(argv):
             print(f"Found {num_failed:3} failed of {num_total:3} total gsnap chunks ({percent_failed:3.0f}% failure rate) under {sample_results_path}.")
             if DEBUG:
                 print(json.dumps(sorted(read_1_chunk_ids ^ gsnap_success_ids), indent=4).replace("\n", "    \n"))
+            for failed_id in read_1_chunk_ids ^ gsnap_success_ids:
+                sample_id = sample_results_path.split("/results/", 1)[0].rsplit("/", 1)[1]
+                failed_chunks.append({
+                    's3_path': f"{sample_results_path}/chunks/{GSNAP_INPUT_PREFIX}{failed_id}",
+                    'suitable_local_name': f"sample-{sample_id}-{GSNAP_INPUT_PREFIX}{failed_id}"
+                })
     percent_failed = 100.0 * project_failed_chunks / project_total_chunks
     print("--------------------------------------------------------------------------------------------------------")
     print(f"Found {project_failed_chunks} failed of {project_total_chunks} total gsnap chunks ({percent_failed:3.0f}% failure rate) under project {project_path}.")
-    #print(json.dumps(samples_results_paths, indent=4))
+    failed_chunks = sorted(failed_chunks, key=lambda d: d['s3_path'])
+    assert len(failed_chunks) == project_failed_chunks
+    #print(json.dumps(failed_chunks, indent=4))
+    threads = []
+    failed_downloads = {}
+    if len(argv) > 2 and argv[2].lower().strip("-") == "download":
+        for fc in failed_chunks:
+            command = f"aws s3 cp --only-show-errors {fc['s3_path']} {fc['suitable_local_name']}"
+            t = threading.Thread(target=download, args=[command, failed_downloads])
+            t.start()
+            threads.append(t)
+    for t in threads:
+        t.join()
+    if failed_downloads:
+        print("ERROR:  {len(failed_downloads)} downloads failed.")
+        return EXIT_DOWNLOAD_ERRORS
     return EXIT_SUCCESS
 
 

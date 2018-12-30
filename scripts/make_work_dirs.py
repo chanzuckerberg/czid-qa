@@ -77,14 +77,14 @@ def main(argv):
         os.makedirs(workdir, exist_ok=False)
         for chunk in [r1, r2]:
             os.link(f"{downloaded_chunks_path}/{chunk}", f"{workdir}/{chunk}")
-            run_cmd = RUN_TEMPLATE.format(R1=r1, R2=r2, WORKDIR_TAIL=workdir_tail)
-            with open(f"{workdir}/run.sh", "w") as runsh:
-                runsh.write(run_cmd)
-            check_output(f"chmod a+x {workdir}/run.sh", quiet=True)
-            continuously_run_cmd = CONTINUOUSLY_RUN_TEMPLATE.format(R1=r1)
-            with open(f"{workdir}/continuously_run.sh", "w") as crush:
-                crush.write(continuously_run_cmd)
-            check_output(f"chmod a+x {workdir}/continuously_run.sh", quiet=True)
+        scripts = [
+            ("run.sh", RUN_TEMPLATE.format(R1=r1, R2=r2, WORKDIR_TAIL=workdir_tail)),
+            ("continuously_run.sh", CONTINUOUSLY_RUN_TEMPLATE.format(R1=r1))
+        ]
+        for script_name, script_code in scripts:
+            with open(f"{workdir}/{script_name}", "w") as scrif:
+                scrif.write(script_code)
+            check_output(f"chmod a+x {workdir}/{script_name}", quiet=True)
     return EXIT_SUCCESS
 
 

@@ -54,14 +54,15 @@ def drop(prefix, s, suffix):
     return s[len(prefix) : len(s) - len(suffix)]
 
 
-def download(command, failed_downloads, downloader_license=threading.Semaphore(CONCURRENT_DOWNLOADS), lock=threading.RLock()):
-    with downloader_license:
-        try:
-            check_output(command)
-        except:
-            with lock:
-                failed_downloads[command] = True
-            raise
+def download(command, failed_downloads, downloader_license, lock=threading.RLock()):
+    try:
+        check_output(command)
+    except:
+        with lock:
+            failed_downloads[command] = True
+        raise
+    finally:
+        downloader_license.release()
 
 
 def main(argv):
@@ -115,12 +116,14 @@ def main(argv):
     #print(json.dumps(failed_chunks, indent=4))
     threads = []
     failed_downloads = {}
+    downloader_license = threading.Semaphore(CONCURRENT_DOWNLOADS)
     if len(argv) > 2 and argv[2].lower().strip("-") == "download":
         for fc in failed_chunks:
             command_1 = f"aws s3 cp --only-show-errors {fc['s3_path']} {fc['suitable_local_name']}"
             command_2 = command_1.replace("_1.fa-chunksize-", "_2.fa-chunksize-")
             for command in [command_1, command_2]:
-                t = threading.Thread(target=download, args=[command, failed_downloads])
+                downloader_license.acquire()
+                t = threading.Thread(target=download, args=[command, failed_downloads, downloader_license])
                 t.start()
                 threads.append(t)
     for t in threads:

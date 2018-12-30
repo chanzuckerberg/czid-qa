@@ -117,10 +117,12 @@ def main(argv):
     failed_downloads = {}
     if len(argv) > 2 and argv[2].lower().strip("-") == "download":
         for fc in failed_chunks:
-            command = f"aws s3 cp --only-show-errors {fc['s3_path']} {fc['suitable_local_name']}"
-            t = threading.Thread(target=download, args=[command, failed_downloads])
-            t.start()
-            threads.append(t)
+            command_1 = f"aws s3 cp --only-show-errors {fc['s3_path']} {fc['suitable_local_name']}"
+            command_2 = command_1.replace("_1.fa-chunksize-", "_2.fa-chunksize-")
+            for command in [command_1, command_2]:
+                t = threading.Thread(target=download, args=[command, failed_downloads])
+                t.start()
+                threads.append(t)
     for t in threads:
         t.join()
     if failed_downloads:

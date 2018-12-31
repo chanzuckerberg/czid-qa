@@ -35,3 +35,10 @@ This will create folders `workdir/repro_XXXXX_YY` for all `failed_chunks`.  To r
     > nohup ./continuously_run.sh &
     > tail -f nohup.out
 ```
+
+3. To run a new version of gsnap on reads classified a certain way by an older verison,
+first download the fasta from idseq, then strip it of annotations and split it into
+r1 and r2 files as follows:
+```
+cat patient_11_prod_70_4534_torque-teno-midi-virus-11-hits.fasta | ./reverse_idseq.py r1.fa r2.fa
+```

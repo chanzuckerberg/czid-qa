@@ -55,9 +55,9 @@ def main(argv):
                 # print(f"Incomplete read pair for {header}")
                 incomplete_pairs += 1
             else:
-                r1.write(header + "\n")
+                r1.write(">" + header + "\n")
                 r1.write(reads[header][0] + "\n")
-                r2.write(header + "\n")
+                r2.write(">" + header + "\n")
                 r2.write(reads[header][1] + "\n")
     x1 = len(unclassified)
     x2 = incomplete_pairs - len(unclassified)

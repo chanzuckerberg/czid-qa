@@ -1,5 +1,7 @@
-# IDseq QA
-Custom tools to QA new releases of gsnap, rapsearch, STAR, or any other bioinformatics tool used in the [IDseq pipeline.](https://github.com/chanzuckerberg/idseq-dag/)
+# CZ ID QA
+Custom tools to QA new releases of gsnap, rapsearch, STAR, or any other bioinformatics tool used in the [CZ ID pipeline.](https://github.com/chanzuckerberg/czid-dag/)
+
+This repo is formerly known as idseq-qa
 
 # Example use
 
